@@ -11,35 +11,38 @@ export function initTable(settings, onAction) {
     const { tableTemplate, rowTemplate, before, after } = settings;
     const root = cloneTemplate(tableTemplate);
 
-    // @todo: #1.2 — Выводим дополнительные шаблоны до и после таблицы
+    // Вставляем дополнительные шаблоны до таблицы
     before.reverse().forEach(subName => {
         root[subName] = cloneTemplate(subName);
         root.container.prepend(root[subName].container);
     });
 
+    // И после таблицы
     after.forEach(subName => {
         root[subName] = cloneTemplate(subName);
         root.container.append(root[subName].container);
     });
 
     const render = (data) => {
-        // @todo: #1.1 — Преобразуем данные в строки на основе шаблона rowTemplate
+        // Шаг 1.1 — преобразуем данные в строки
         const nextRows = data.map(item => {
+            
             const row = cloneTemplate(rowTemplate);
+
             Object.keys(item).forEach(key => {
-                if (key in row.elements) {
-                    const element = row.elements[key];
-                    if (element.tagName.toLowerCase() === 'input' || element.tagName.toLowerCase() === 'select') {
-                        element.value = item[key];
+                if (row.elements[key]) {
+                    if (['INPUT', 'SELECT'].includes(row.elements[key].tagName)) {
+                        row.elements[key].value = item[key];
                     } else {
-                        element.textContent = item[key];
+                        row.elements[key].textContent = item[key];
                     }
                 }
             });
+
             return row.container;
         });
 
-        // Заменяем старые строки новыми
+        // Меняем старые строки новыми
         root.elements.rows.replaceChildren(...nextRows);
     };
 
