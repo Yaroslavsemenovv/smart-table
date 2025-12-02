@@ -1,4 +1,3 @@
-
 const BASE_URL = 'https://webinars.webdev.education-services.ru/sp7-api';
 
 export function initData(sourceData) {
@@ -47,10 +46,11 @@ export function initData(sourceData) {
     };
 
 
-    const getRecords = async (query, isUpdated = false) => {
+    const getRecords = async (query = {}, isUpdated = false) => {
 
         if (sourceData) {
-            const items = sourceData.purchase_records.map(item => ({
+            // сначала строим полный список (это нужно для total)
+            const allItems = sourceData.purchase_records.map(item => ({
                 id: item.receipt_id,
                 date: item.date,
                 seller: sellers[item.seller_id],
@@ -58,8 +58,16 @@ export function initData(sourceData) {
                 total: item.total_amount
             }));
 
+            // затем применяем пагинацию из query
+            const limit = Number(query.limit ?? query.rowsPerPage ?? 0);
+            const page = Number(query.page ?? 1);
+
+            const items = limit > 0
+                ? allItems.slice((page - 1) * limit, (page - 1) * limit + limit)
+                : allItems;
+
             return {
-                total: items.length,
+                total: allItems.length,
                 items
             };
         }
