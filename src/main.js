@@ -1,113 +1,114 @@
-// === Импорт шрифтов и стилей ===
-import './fonts/ys-display/fonts.css';
-import './style.css';
+  // === Импорт шрифтов и стилей ===
+  import './fonts/ys-display/fonts.css';
+  import './style.css';
 
-// === Импорт локальных данных (моки) ===
-import { data as sourceData } from "./data/dataset_1.js";
+  // === Импорт локальных данных (моки) ===
+  import { data as sourceData } from "./data/dataset_1.js";
 
-// === Импорт API функции ===
-import { initData } from "./data.js";
-import { processFormData } from "./lib/utils.js";
+  // === Импорт API функции ===
+  import { initData } from "./data.js";
+  import { processFormData } from "./lib/utils.js";
 
-// === Импорт компонентов таблицы и её модулей ===
-import { initTable } from "./components/table.js";
-import { initPagination } from "./components/pagination.js";
-import { initSorting } from "./components/sorting.js";
-import { initFiltering } from "./components/filtering.js";
-import { initSearching } from "./components/searching.js";
+  // === Импорт компонентов таблицы и её модулей ===
+  import { initTable } from "./components/table.js";
+  import { initPagination } from "./components/pagination.js";
+  import { initSorting } from "./components/sorting.js";
+  import { initFiltering } from "./components/filtering.js";
+  import { initSearching } from "./components/searching.js";
 
-const api = initData(sourceData);
+  const api = initData();
 
-//объявляем в module-scope, чтобы render() видел
-let applyPagination;
-let updatePagination;
+  //объявляем в module-scope, чтобы render() видел
+  let applyPagination;
+  let updatePagination;
 
-//для серверной фильтрации (шаг 3)
-let applyFiltering;
-let updateIndexes;
+  //для серверной фильтрации (шаг 3)
+  let applyFiltering;
+  let updateIndexes;
 
-//для серверного поиска (шаг 4)
-let applySearching;
+  //для серверного поиска (шаг 4)
+  let applySearching;
 
-function collectState(tableRoot) {
-  const state = processFormData(new FormData(tableRoot));
+  //для сортировки (шаг 5)
+  let applySorting;
 
-  const rowsPerPage = parseInt(state.rowsPerPage);
-  const page = parseInt(state.page ?? 1);
 
-  return {
-    ...state,
-    rowsPerPage,
-    page
-  };
-}
+  function collectState(tableRoot) {
+    const state = processFormData(new FormData(tableRoot));
 
-async function render(action) {
-  //передаём корень формы/контейнер таблицы
-  const state = collectState(sampleTable.container);
+    const rowsPerPage = parseInt(state.rowsPerPage);
+    const page = parseInt(state.page ?? 1);
 
-  let query = {};
-  // другие apply*
+    return {
+      ...state,
+      rowsPerPage,
+      page
+    };
+  }
 
-  //поиск через сервер (шаг 4)
-    query = applySearching(query, state, action);
-  // применяем фильтрацию через сервер (шаг 3)
-    query = applyFiltering(query, state, action);
-  // query = applySorting(query, state, action);
-    query = applyPagination(query, state, action);
+  async function render(action) {
+    const state = collectState(sampleTable.container);
 
-    const { total, items } = await api.getRecords(query);
+    let query = {};
+    // другие apply*
 
-    updatePagination(total, query);
-    sampleTable.render(items);
+    //поиск через сервер
+        query = applySearching(query, state, action);
+        query = applyFiltering(query, state, action);
+        query = applySorting(query, state, action);
+        query = applyPagination(query, state, action);
 
-    console.log('QUERY', query);
+        const { total, items } = await api.getRecords(query);
 
-}
+        updatePagination(total, query);
+        sampleTable.render(items);
 
-// === Инициализация таблицы ===
-const sampleTable = initTable({
-  tableTemplate: 'table',
-  rowTemplate: 'row',
-  before: ['search', 'header', 'filter'],
-  after: ['pagination']
-}, render);
+  }
 
-const appRoot = document.querySelector('#app');
-appRoot.appendChild(sampleTable.container);
+  // === Инициализация таблицы ===
+  const sampleTable = initTable({
+    tableTemplate: 'table',
+    rowTemplate: 'row',
+    before: ['search', 'header', 'filter'],
+    after: ['pagination']
+  }, render);
 
-async function init() {
-  const indexes = await api.getIndexes();
+    const appRoot = document.querySelector('#app');
+    appRoot.appendChild(sampleTable.container);
 
-  // поиск: инициализируем функцию применения (шаг 4)
-  applySearching = initSearching('search');
+  async function init() {
+      const indexes = await api.getIndexes();
 
-  // 2. фильтры: инициализируем модуль и получаем две функции
-  ({ applyFiltering, updateIndexes } = initFiltering(sampleTable.filter.elements));
+      // поиск: инициализируем функцию применения (шаг 4)
+      applySearching = initSearching('search');
 
-  // заполняем селект продавцов значениями с сервера
-  updateIndexes(sampleTable.filter.elements, {
-    searchBySeller: indexes.sellers
-  });
+      // 2. фильтры: инициализируем модуль и получаем две функции
+      ({ applyFiltering, updateIndexes } = initFiltering(sampleTable.filter.elements));
 
-  // 3. сортировка
-  const applySorting = initSorting([
-    sampleTable.header.elements.sortByDate,
-    sampleTable.header.elements.sortByTotal
-  ]);
+      // заполняем селект продавцов значениями с сервера
+      updateIndexes(sampleTable.filter.elements, {
+        searchBySeller: indexes.sellers
+      });
 
-  // 4. пагинация
-  ({ applyPagination, updatePagination } = initPagination(
-    sampleTable.pagination.elements,
-    (el, page, isCurrent) => {
-      const input = el.querySelector('input');
-      const label = el.querySelector('span');
-      input.value = page;
-      input.checked = isCurrent;
-      label.textContent = page;
-      return el;
-    }
-  ));
-}
+    // 3. сортировка
+      applySorting = initSorting([
+      sampleTable.header.elements.sortByDate,
+      sampleTable.header.elements.sortByTotal
+    ]);
 
-init().then(render);
+
+    // 4. пагинация
+    ({ applyPagination, updatePagination } = initPagination(
+      sampleTable.pagination.elements,
+      (el, page, isCurrent) => {
+        const input = el.querySelector('input');
+        const label = el.querySelector('span');
+        input.value = page;
+        input.checked = isCurrent;
+        label.textContent = page;
+        return el;
+      }
+    ));
+  }
+
+  init().then(render);
